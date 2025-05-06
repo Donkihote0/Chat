@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chat App</title>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+    <style>
+        body {
+          font-family: Arial, sans-serif;
+          background-color: #f4f7f9;
+          margin: 0;
+          padding: 0;
+        }
+
+        .chat-container {
+          max-width: 600px;
+          margin: 40px auto;
+          background: white;
+          border-radius: 10px;
+          box-shadow: 0 0 10px rgba(0,0,0,0.1);
+          display: flex;
+          flex-direction: column;
+          height: 80vh;
+        }
+
+        .chat-header {
+          background: #007bff;
+          color: white;
+          padding: 15px;
+          border-top-left-radius: 10px;
+          border-top-right-radius: 10px;
+        }
+
+        #chat {
+          flex-grow: 1;
+          padding: 15px;
+          overflow-y: auto;
+          background: #eef1f5;
+          font-size: 14px;
+        }
+
+        .chat-message {
+          margin-bottom: 10px;
+        }
+
+        .chat-input {
+          display: flex;
+          padding: 10px;
+          border-top: 1px solid #ddd;
+        }
+
+        .chat-input input[type="text"] {
+          flex-grow: 1;
+          padding: 10px;
+          font-size: 14px;
+          border-radius: 5px;
+          border: 1px solid #ccc;
+        }
+
+        .chat-input button {
+          margin-left: 10px;
+          padding: 10px 15px;
+          font-size: 14px;
+          background: #007bff;
+          border: none;
+          color: white;
+          border-radius: 5px;
+          cursor: pointer;
+        }
+
+        .room-setup {
+          padding: 15px;
+          background: #f0f0f0;
+        }
+
+        #roomId {
+          width: 60%;
+          padding: 8px;
+          margin-right: 10px;
+        }
+
+        #connectBtn {
+          padding: 8px 12px;
+          font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+<div class="chat-container">
+    <div class="chat-header">
+        <strong>Messengay</strong>
+    </div>
+
+    <div class="room-setup">
+        <input type="text" id="roomId" placeholder="Nhập phòng cần tham gia">
+        <button id="connectBtn" onclick="connect()">Vào phòng</button>
+        <input type="hidden" id="username">
+    </div>
+
+    <div id="chat"></div>
+
+    <div class="chat-input">
+        <input type="text" id="messageInput" placeholder="Nhập tin nhắn..." onkeydown="handleKeyDown(event)">
+        <button onclick="sendMessage()">Gửi</button>
+    </div>
+</div>
+
+<script>
+    let stompClient = null;
+    let roomId = "";
+
+    document.addEventListener("DOMContentLoaded", () => {
+      // Lấy username từ backend sau khi login
+      fetch("/user")
+        .then(res => res.text())
+        .then(username => {
+          document.getElementById("username").value = username;
+        });
+    });
+
+    function connect() {
+      roomId = document.getElementById("roomId").value.trim();
+      const username = document.getElementById("username").value;
+
+      if (!roomId || !username) {
+        alert("Bạn cần nhập phòng hợp lệ.");
+        return;
+      }
+
+      // Tải lịch sử tin nhắn từ server
+      fetch(`/api/messages/${roomId}`)
+        .then(res => res.json())
+        .then(history => {
+          document.getElementById("chat").innerHTML = "";
+          showMessage(`📜 Đang xem lịch sử phòng: ${roomId}`);
+          history.forEach(msg => {
+            const time = msg.timestamp?.substring(11, 16);
+            showMessage(`${msg.sender}: ${msg.content} (${time})`);
+          });
+        });
+
+      // WebSocket
+      const socket = new SockJS("/ws");
+      stompClient = Stomp.over(socket);
+      stompClient.connect({}, () => {
+        stompClient.subscribe(`/topic/room/${roomId}`, (msg) => {
+          const message = JSON.parse(msg.body);
+          showMessage(`${message.sender}: ${message.content} (${message.time})`);
+        });
+
+        showMessage(`✅ Đã vào phòng: ${roomId}`);
+      });
+    }
+
+    function sendMessage() {
+      const content = document.getElementById("messageInput").value.trim();
+      const username = document.getElementById("username").value;
+
+      if (content && stompClient && roomId) {
+        stompClient.send(`/app/chat.send/${roomId}`, {}, JSON.stringify({
+          sender: username,
+          content: content
+        }));
+        document.getElementById("messageInput").value = "";
+      }
+    }
+
+    function showMessage(text) {
+      const chat = document.getElementById("chat");
+      const div = document.createElement("div");
+      div.classList.add("chat-message");
+      div.textContent = text;
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+    }
+    function handleKeyDown(event) {
+  if (event.key === "Enter") {
+    sendMessage();
+  }
+}
+
+</script>
+</body>
+</html>
+

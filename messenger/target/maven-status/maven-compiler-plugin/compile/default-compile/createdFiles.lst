@@ -1,0 +1,9 @@
+messenger\messenger\controller\ChatController.class
+messenger\messenger\MessengerApplication.class
+messenger\messenger\model\ChatMessageEntity.class
+messenger\messenger\config\WebSocketConfig.class
+messenger\messenger\controller\UserController.class
+messenger\messenger\config\SecurityConfig.class
+messenger\messenger\controller\MessageHistoryController.class
+messenger\messenger\repository\ChatMessageRepository.class
+messenger\messenger\model\ChatMessage.class
